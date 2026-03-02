@@ -1,4 +1,5 @@
 const STORAGE_KEY = "infinite-board-v5";
+const STORAGE_FALLBACK_KEYS = ["infinite-board-v5", "infinite-board-v4", "infinite-board-v3", "infinite-board-v2", "infinite-board-v1"];
 const PILL_PALETTE = ["#7ef3ff", "#ffd54f", "#ff8a80", "#b39ddb", "#80cbc4", "#ffcc80", "#90caf9", "#a5d6a7"];
 
 const state = {
@@ -69,6 +70,11 @@ function bindUI() {
   els.addPeriodRow.addEventListener("click", () => addTimelineRow("period"));
   els.cancelTimeline.addEventListener("click", () => els.timelineDialog.close("cancel"));
   els.undoBtn?.addEventListener("click", undoLastAction);
+
+  window.addEventListener("beforeunload", save);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") save();
+  });
 
   let panning = false;
   let start = { x: 0, y: 0 };
@@ -683,6 +689,7 @@ function drawConnection(conn, board) {
 
 
 function createBoard(name, options = {}) {
+  if (!options.skipUndo) pushUndoState();
   const id = crypto.randomUUID();
   state.boards[id] = { id, name, nodes: [], connections: [] };
   state.activeBoardId = id;
@@ -703,16 +710,40 @@ function applyViewport() {
 }
 
 function load() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return;
-  const parsed = JSON.parse(raw);
-  state.boards = parsed.boards || {};
-  state.activeBoardId = parsed.activeBoardId || null;
+  let parsed = null;
+
+  for (const key of STORAGE_FALLBACK_KEYS) {
+    const raw = localStorage.getItem(key);
+    if (!raw) continue;
+    try {
+      const candidate = JSON.parse(raw);
+      if (candidate && typeof candidate === "object") {
+        parsed = candidate;
+        if (key !== STORAGE_KEY) localStorage.setItem(STORAGE_KEY, raw);
+        break;
+      }
+    } catch {
+      // dato corrupto, seguimos con otras claves
+    }
+  }
+
+  if (!parsed) return;
+
+  state.boards = parsed.boards && typeof parsed.boards === "object" ? parsed.boards : {};
+  state.activeBoardId = parsed.activeBoardId || Object.keys(state.boards)[0] || null;
   state.viewport = parsed.viewport || state.viewport;
 }
 
+
 function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ boards: state.boards, activeBoardId: state.activeBoardId, viewport: state.viewport }));
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ boards: state.boards, activeBoardId: state.activeBoardId, viewport: state.viewport, updatedAt: Date.now() })
+    );
+  } catch (err) {
+    console.warn("No se pudo guardar en localStorage", err);
+  }
   updateUndoButton();
 }
 
