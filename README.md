@@ -17,7 +17,7 @@ Aplicación web para organizar proyectos en pizarras separadas, con nodos visual
 - Exportación de JSON de la pizarra activa (descarga de archivo `.json`).
 - Pan (`Shift + arrastrar`) y zoom (rueda).
 - Botón de deshacer (`↶ Deshacer`) para revertir la última acción.
-- Persistencia en `localStorage`.
+- Persistencia robusta en `localStorage` (incluye guardado al salir/ocultar pestaña y compatibilidad con claves previas).
 
 ## Ejecutar
 
